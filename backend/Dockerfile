@@ -17,8 +17,8 @@ COPY backend/requirements.txt backend-requirements.txt
 RUN pip wheel -r backend-requirements.txt --wheel-dir /wheels
 
 # 3. clone parser and build its wheels
-RUN git clone --branch tested_branch \
-      https://github.com/goodven152/parser_GETenders.git /opt/parser && \
+RUN git clone --branch main \
+      https://github.com/goodven152-hash/parser_GE_Tenders.git /opt/parser && \
     pip wheel -r /opt/parser/requirements.txt --wheel-dir /wheels && \
     rm -rf /opt/parser/.git          # убрать историю, чтобы не тащить в final
 
