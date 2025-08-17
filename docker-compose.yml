@@ -1,0 +1,25 @@
+version: '3.9'          # можно и вовсе опустить – в Compose Spec он устарел
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    volumes:
+      - ./config.json:/app/config.json
+      - ./logs:/app/logs
+    ports: ["8000:8000"]
+
+    # ───────────────────────────────────────────────
+    deploy:
+      resources:
+        limits:
+          cpus: "1.50"        # контейнер не получит > 1.5 ядра
+          memory: 2g          # и не выйдет за 2 ГБ RAM
+        reservations:
+          cpus: "0.50"        # оркестратор гарантирует ≥ 0.5 ядра
+          memory: 1g          # и ≥ 1 ГБ RAM
+
+  frontend:
+    build: ./frontend
+    ports: ["8080:80"]
+    depends_on: [ backend ]
