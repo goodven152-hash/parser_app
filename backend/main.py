@@ -6,29 +6,27 @@ from apscheduler.triggers.cron import CronTrigger
 from starlette.websockets import WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from croniter import croniter, CroniterBadCronError   # pip install croniter
-from zoneinfo import ZoneInfo
-
+from config import SERVER_TZ, CRON_FILE, CONF_PATH
 
 app = FastAPI()
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],   # откуда разрешаем
+    allow_origins=[
+        "http://localhost:8080",
+        "http://45.14.244.50:8080",
+    ],                                        # откуда разрешаем
     allow_credentials=True,                   # если нужны cookies / auth-заголовки
     allow_methods=["*"],                      # какие HTTP-методы
     allow_headers=["*"],                      # и какие заголовки принимать
 )
-scheduler=BackgroundScheduler(); scheduler.start()
+scheduler=BackgroundScheduler(); 
+scheduler.start()
 
-
-CRON_FILE = pathlib.Path("/app/cron.txt")
+# ── cron-строка ─────────────────────────────
 if not CRON_FILE.exists():
     CRON_FILE.write_text("0 2 * * *")
-
 _cron_expr: str = CRON_FILE.read_text().strip()
-
-# определяем часовой пояс сервера (по systemd), по умолчанию Asia/Tbilisi
-SERVER_TZ = ZoneInfo(os.environ.get("SERVER_TZ", "Asia/Tbilisi"))
 
 # ── helper to (re)register cron job ────────────────────────────
 def _schedule_job():
@@ -113,7 +111,6 @@ async def ws(websocket: WebSocket):
         pass                             # молча выходим
 
 # -------- CONFIG & KEYWORDS -----------------------------------------------
-CONF_PATH = pathlib.Path("/app/config.json")
 
 @app.get("/config")
 def get_config():

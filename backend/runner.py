@@ -1,16 +1,14 @@
-# ─── в самом верху файла ───
+
 import signal
-# …
-
 import json, uuid, subprocess, threading, datetime, os, sqlite3, queue, pathlib
-
 import shutil, json
 import re
-LOG_DIR = pathlib.Path("/app/logs")          # общий каталог для всех артефактов
+from psycopg2.extras import RealDictCursor
+import psycopg2
+from config import DATABASE_URL
+from config import CONF_PATH, DB_PATH, LOG_DIR
+
 LOG_DIR.mkdir(exist_ok=True)
-
-
-
 _current = {
     "id": None,
     "progress": 0,
@@ -85,37 +83,44 @@ def _reader(proc, run_id):
              code, "".join(log_lines))
 
     # ── если парсер создал found_tenders.json — переименуем под run_id
-    src = pathlib.Path("/app/found_tenders.json")
+    src = CONF_PATH 
     if src.exists():
         dst = LOG_DIR / f"{run_id}.json"
         shutil.move(src, dst)                # теперь логика фронта знает путь
 
     _current.update({"id": None, "progress": 0, "proc": None})
 
-CONF_PATH = pathlib.Path("/app/config.json")
-DB_PATH   = pathlib.Path("/app/runs.db")
 
 # --- storage ---------------------------------------------------------------
-def _init_db():
-    with sqlite3.connect(DB_PATH) as c:
-        c.execute("""CREATE TABLE IF NOT EXISTS runs (
-            id TEXT PRIMARY KEY,
-            started TEXT,
-            finished TEXT,
-            returncode INT,
-            log TEXT
-        )""")
-_init_db()
+def init_db():
+    with psycopg2.connect(DATABASE_URL) as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS runs (
+                    id TEXT PRIMARY KEY,
+                    started TIMESTAMP,
+                    finished TIMESTAMP,
+                    returncode INT,
+                    log TEXT
+                )
+            """)
+init_db()
 
 def save_run(run_id, started, finished=None, code=None, log=""):
-    with sqlite3.connect(DB_PATH) as c:
-        c.execute("""INSERT OR REPLACE INTO runs(id,started,finished,returncode,log)
-                     VALUES(?,?,?,?,?)""", (run_id,started,finished,code,log))
+    with psycopg2.connect(DATABASE_URL) as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                INSERT INTO runs (id, started, finished, returncode, log)
+                VALUES (%s, %s, %s, %s, %s)
+                ON CONFLICT (id) DO UPDATE
+                SET finished = EXCLUDED.finished,
+                    returncode = EXCLUDED.returncode,
+                    log = EXCLUDED.log
+            """, (run_id, started, finished, code, log))
 
 def last_runs(limit=10):
-    with sqlite3.connect(DB_PATH) as c:
-        cur=c.execute("SELECT * FROM runs ORDER BY started DESC LIMIT ?",(limit,))
-        cols=[d[0] for d in cur.description]
-        return [dict(zip(cols,r)) for r in cur.fetchall()]
-
+    with psycopg2.connect(DATABASE_URL, cursor_factory=RealDictCursor) as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT * FROM runs ORDER BY started DESC LIMIT %s", (limit,))
+            return list(cur)
 # --- runner ----------------------------------------------------------------

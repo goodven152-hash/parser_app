@@ -5,6 +5,9 @@ WORKDIR /build
 # 1. system deps (одним RUN слоем)
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
+        gcc \
+        libpq-dev \
+        build-essential \
         git \
         chromium chromium-driver fonts-liberation \
         libasound2 libatk-bridge2.0-0 libnspr4 libnss3 \
@@ -14,7 +17,8 @@ RUN apt-get update && \
 
 # 2. backend requirements → wheels
 COPY backend/requirements.txt backend-requirements.txt  
-RUN pip wheel -r backend-requirements.txt --wheel-dir /wheels
+RUN pip install --upgrade pip setuptools wheel && \
+    pip wheel -r backend-requirements.txt --wheel-dir /wheels
 
 # 3. clone parser and build its wheels
 RUN git clone --branch master \

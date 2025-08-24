@@ -1,25 +1,45 @@
-version: '3.9'          # можно и вовсе опустить – в Compose Spec он устарел
+version: '3.9'
+
 services:
   backend:
     build:
       context: .
       dockerfile: backend/Dockerfile
     volumes:
-      - ./config.json:/app/config.json
+      - ${CONFIG_PATH}:/opt/parser/config.json
       - ./logs:/app/logs
-    ports: ["8000:8000"]
-
-    # ───────────────────────────────────────────────
+    ports:
+      - "8000:8000"
+    depends_on:
+      - db
+    environment:
+      DATABASE_URL: ${DATABASE_URL}
+      CONFIG_PATH: ${CONFIG_PATH}
     deploy:
-      resources:
+      resources:  
         limits:
-          cpus: "1.50"        # контейнер не получит > 1.5 ядра
-          memory: 2g          # и не выйдет за 2 ГБ RAM
+          cpus: "1.50"
+          memory: 2g
         reservations:
-          cpus: "0.50"        # оркестратор гарантирует ≥ 0.5 ядра
-          memory: 1g          # и ≥ 1 ГБ RAM
+          cpus: "0.50"
+          memory: 1g
+
+  db:
+    image: postgres:15
+    restart: always
+    environment:
+      POSTGRES_USER: parser_user
+      POSTGRES_PASSWORD: parser_password
+      POSTGRES_DB: parser_db
+    volumes:
+      - db_data:/var/lib/postgresql/data
 
   frontend:
     build: ./frontend
-    ports: ["8080:80"]
-    depends_on: [ backend ]
+    ports:
+      - "8080:80"
+    depends_on:
+      - backend
+
+volumes:
+  db_data:

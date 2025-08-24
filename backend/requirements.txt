@@ -4,3 +4,4 @@ apscheduler
 pydantic
 python-multipart
 croniter
+psycopg2-binary
